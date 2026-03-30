@@ -1,0 +1,99 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+generator client {
+  provider = "prisma-client"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  customer
+  organizer
+}
+
+enum EventCategory {
+  Music
+  Nightlife
+  Education
+  Food
+  Workshop
+  Sports
+}
+
+model User {
+  id           String @id @default(uuid())
+  fullName     String
+  email        String @unique
+  password     String
+  role         Role
+  referralCode String @unique
+
+  // Self-relation untuk tracking siapa yang me-refer
+  referredBy String?
+  referrer   User?   @relation("UserReferrals", fields: [referredBy], references: [id])
+  referees   User[]  @relation("UserReferrals")
+
+  isVerified Boolean  @default(false)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  // Auth Tokens
+  verificationToken           String?
+  verificationTokenExpiresAt  DateTime?
+  resetPasswordToken          String?
+  resetPasswordTokenExpiresAt DateTime?
+
+  lastSentAt DateTime?
+
+  // Relations ke fitur Point & Coupon
+  points  Point[]
+  coupons Coupon[]
+
+  events Event[] @relation("OrganizerEvents")
+}
+
+model Event {
+  id             String        @id @default(uuid())
+  title          String
+  description    String        @db.Text
+  price          Int           @default(0) // 0 berarti Free Event sesuai MVP
+  date           DateTime
+  time           String // e.g., "19:00"
+  location       String
+  availableSeats Int
+  category       EventCategory
+  image          String? // URL untuk poster event
+
+  // Relations
+  organizerId String
+  organizer   User   @relation("OrganizerEvents", fields: [organizerId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model Point {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  amount    Int      @default(10000)
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  expiresAt DateTime // Diisi manually saat create: now + 3 months
+}
+
+model Coupon {
+  id        Int      @id @default(autoincrement())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  discount  Float    @default(0.1) // 10%
+  isUsed    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  expiresAt DateTime // now + 3 months
+}
